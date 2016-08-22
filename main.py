@@ -14,14 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+""" preserve case, whitespace, punctuation. escape html
+"""
 import webapp2
+import cgi
 
 form="""
-<form method="post">
-    <h2>Enter some text to ROT13</h2> 
-    <br/>
-        <textarea rows="8" cols="80" name="rot13" value="%(rot13)s">
-        </textarea>
+<form method="post" action="/">
+    <h2>Enter some text to encrypt</h2> 
+        <label>Offset:</label>
+        <input type="text" name="offset" value="%(offset)s">
+        <br>
+        <br>
+        <textarea rows="8" cols="80" name="encrypted">%(encrypted)s</textarea>
         <div style="color: red">%(error)s</div>
     <br>
     <br>
@@ -29,13 +34,61 @@ form="""
 </form>
 """
 
+def rot13_encrypt(s):
+    new_str = ""
+    for ch in s:
+        if ch.isalpha():
+            if ch.isupper():
+                new_str += chr( ( (ord(ch) - ord('A') ) + 13) % 26 + ord('A') )
+            else:
+                new_str += chr( ( (ord(ch) - ord('a') ) + 13) % 26 + ord('a') )
+        elif ch.isdigit():
+            new_str += chr( ( (ord(ch) - ord('0') ) + 13) % 10 + ord('0') )
+        else:
+            new_str += ch
+
+    return new_str
+
+def caeser_encrypt(s, offset):
+    new_str = ""
+    for ch in s:
+        if ch.isalpha():
+            if ch.isupper():
+                new_str += chr( ( (ord(ch) - ord('A') ) + int(offset) ) % 26 + ord('A') )
+            else:
+                new_str += chr( ( (ord(ch) - ord('a') ) + int(offset)) % 26 + ord('a') )
+        elif ch.isdigit():
+            new_str += chr( ( (ord(ch) - ord('0') ) + int(offset)) % 10 + ord('0') )
+        else:
+            new_str += ch
+
+    return new_str
+
 
 class MainHandler(webapp2.RequestHandler):
-    def write_form(self, rot13="", error=""):
-        self.response.write(form % {"rot13": rot13, "error": error})
+    def write_form(self, encrypted="", offset="", error=""):
+        self.response.write(form % {"encrypted": encrypted, "offset": offset, "error": error})
 
     def get(self):
         self.write_form()
+
+    def post(self):
+        #encrypted = rot13_encrypt( cgi.escape(self.request.get('encrypted')) )
+        text = cgi.escape(self.request.get('encrypted'))
+        offset = cgi.escape(self.request.get('offset'))
+
+        if not text:
+            error = "You need to input some text."
+        elif not offset.isdigit():
+            error = "Invalid offset \'%s\'" % offset
+        else:
+            error = ""
+        
+        if error:
+            self.write_form(text, "", error)
+        else:
+            encrypted = caeser_encrypt(text, offset)
+            self.write_form(encrypted, offset, error) 
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler)
